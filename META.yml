@@ -1,0 +1,31 @@
+---
+abstract: 'Throw exceptions from anywhere - including DESTROY callbacks'
+author:
+  - 'ribasushi: Peter Rabbitson <ribasushi@cpan.org>'
+build_requires:
+  ExtUtils::MakeMaker: 6.42
+  Test::More: 0.92
+configure_requires:
+  ExtUtils::MakeMaker: 6.42
+distribution_type: module
+dynamic_config: 1
+generated_by: 'Module::Install version 1.03'
+license: perl
+meta-spec:
+  url: http://module-build.sourceforge.net/META-spec-v1.4.html
+  version: 1.4
+module_name: Exception::Guaranteed
+name: Exception-Guaranteed
+no_index:
+  directory:
+    - inc
+    - t
+requires:
+  perl: 5.6.0
+resources:
+  IRC: irc://irc.perl.org/#pp
+  bugtracker: http://rt.cpan.org/NoAuth/Bugs.html?Dist=Exception-Guaranteed
+  homepage: http://git.shadowcat.co.uk/gitweb/gitweb.cgi?p=p5sagit/Exception-Guaranteed.git
+  license: http://dev.perl.org/licenses/
+  repository: git://git.shadowcat.co.uk/p5sagit/Exception-Guaranteed.git
+version: 0.00_01
