@@ -16,16 +16,13 @@ my $final_fn = __FILE__;
 my $final_ln = __LINE__ + 1;
 __LabRat->spawn_n_kill( sub { guarantee_exception { die 'Final untrapped exception' } } );
 
-if (Exception::Guaranteed::BROKEN_SELF_SIGNAL) {
-  while ($dummy < 2**31) {
-    $dummy++;
-  }
-  fail ('Should never reach here :(');
+while ($dummy < 2**31) {
+  $dummy++;
 }
+fail ('Should never reach here :(');
 
 END {
-  diag( ($dummy||0) . " inc-ops executed before kill-signal delivery\n" )
-    if Exception::Guaranteed::BROKEN_SELF_SIGNAL;
+  diag( ($dummy||0) . " inc-ops executed before kill-signal delivery\n" );
 
   is (
     $err,
@@ -34,7 +31,8 @@ END {
   );
 
   # check, and then change $? set by the last die
-  is ($?, 255, '$? correctly set by untrapped die()');   # $? in END{} is *NOT* 16bit
+  is ($?, 255, '$? correctly set by untrapped die()')   # $? in END{} is *NOT* 16bit
+    unless Exception::Guaranteed::RUNNING_IN_HELL;      # and windows does crazy shit with $?
 
   $? = 0; # so test will pass
   done_testing;

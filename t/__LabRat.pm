@@ -4,16 +4,15 @@ use warnings;
 use strict;
 
 sub spawn_n_kill (&) {
-  my $cref = $_[1];
   {
-    my $x = bless ( do { \$cref } );
+    my $x = bless [ $_[1], ($INC{'threads.pm'} ? threads->tid : 0) ];
     undef $x;
   }
   1;
 }
 
 sub DESTROY {
-  ${$_[0]}->();
+  $_[0]->[0]->() unless ($_[0]->[1] and threads->tid != $_[0]->[1]);
 }
 
 1;

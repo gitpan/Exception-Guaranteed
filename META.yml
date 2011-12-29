@@ -28,4 +28,4 @@ resources:
   homepage: http://git.shadowcat.co.uk/gitweb/gitweb.cgi?p=p5sagit/Exception-Guaranteed.git
   license: http://dev.perl.org/licenses/
   repository: git://git.shadowcat.co.uk/p5sagit/Exception-Guaranteed.git
-version: 0.00_01
+version: 0.00_02

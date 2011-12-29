@@ -12,6 +12,7 @@ eval {
 };
 like( $@, qr/^Simple exception/, 'A plain exception shoots through' );
 
+my $dummy = 0;
 my $fail = 0;
 eval {
   guarantee_exception {
@@ -19,34 +20,45 @@ eval {
       die 'Exception outer';
     });
   };
-  $fail = 1;
+
+  while( $dummy < 2**31) {
+    $dummy++;
+  }
+
+  $fail = 1;  # we should never reach here
 };
+print STDERR "\n";
+diag( ($dummy||0) . " inc-ops executed before kill-signal delivery (outer g_e)\n" );
 ok (!$fail, 'execution stopped after trappable destroy exception');
 like( $@, qr/^Exception outer/, 'DESTROY exception thrown and caught from outside' );
 
 $fail = 0;
 # when using the fork+signal based approach, I can't make the exception
 # happen fast enough to not shoot out of its real containing eval :(
-# Hence the sleep
-my $dummy = 0;
+# Hence the dummy count here is essential
+$dummy = 0;
 eval {
   __LabRat->spawn_n_kill( sub {
     guarantee_exception {
       die 'Exception inner';
     };
   });
-  if (Exception::Guaranteed::BROKEN_SELF_SIGNAL) {
-    while( $dummy < 2**31) {
-      $dummy++;
-    }
+
+  while( $dummy < 2**31) {
+    $dummy++;
   }
 
-  $fail = 1;  # we outh to never reach this
+  $fail = 1;  # we should never reach here
 };
 
-diag( ($dummy||0) . " inc-ops executed before kill-signal delivery\n" )
-  if Exception::Guaranteed::BROKEN_SELF_SIGNAL;
+diag( ($dummy||0) . " inc-ops executed before kill-signal delivery (DESTROY g_e)\n" );
 ok (!$fail, 'execution stopped after trappable destroy exception');
 like( $@, qr/^Exception inner/, 'DESTROY exception thrown and caught from inside of DESTROY block' );
 
 done_testing;
+
+# important, for the thread re-test, like an exit(0)
+if ($INC{'threads.pm'}) {
+  $ENV{EXCEPTION_GUARANTEED_SUBTEST} = 42;
+  0;
+}

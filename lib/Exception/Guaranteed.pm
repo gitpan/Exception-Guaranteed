@@ -3,7 +3,7 @@ package Exception::Guaranteed;
 use warnings;
 use strict;
 
-our $VERSION = '0.00_01';
+our $VERSION = '0.00_02';
 $VERSION = eval $VERSION if $VERSION =~ /_/;
 
 use Config;
@@ -13,14 +13,34 @@ use base 'Exporter';
 our @EXPORT = ('guarantee_exception');
 our @EXPORT_OK = ('guarantee_exception');
 
-BEGIN {
-  # older perls segfault if the cref behind the goto throws
-  # Perl RT#35878
-  *BROKEN_GOTO = ($] < 5.008_008_9) ? sub () { 1 } : sub () { 0 };
+# this is the minimum acceptable threads.pm version, before it
+# inter-thread signalling may not work right (or is totally missing)
+use constant THREADS_MIN_VERSION => '1.39';
 
-  # perls up until 5.12 (inclusive) seem to be happy with self-signaling
-  # newer ones however segfault, so we resort to a killer sentinel fork
-  *BROKEN_SELF_SIGNAL = ($] < 5.013) ? sub () { 0 } : sub () { 1 };
+# older perls segfault if the cref behind the goto throws
+# Perl RT#35878
+use constant BROKEN_GOTO => ($] < 5.008_008_1);
+
+# kill (and signaling) plain doesn't work on win32 (works on cygwin though)
+use constant RUNNING_IN_HELL => ($^O eq 'MSWin32');
+
+# perls up until 5.12 (inclusive) seem to be happy with self-signaling
+# newer ones however segfault, so we resort to a killer sentinel fork
+use constant BROKEN_SELF_SIGNAL => (!RUNNING_IN_HELL and $] > 5.012_9);
+
+# win32 can only simulate signals with threads - off we go
+# loading them as early as we can
+if (RUNNING_IN_HELL) {
+  require threads;
+  threads->import;
+}
+elsif (BROKEN_SELF_SIGNAL) {
+  require POSIX;  # for POSIX::_exit below
+}
+
+# fail early
+if ($INC{'threads.pm'} and ! eval { threads->VERSION(THREADS_MIN_VERSION) }) {
+  die "At least threads @{[THREADS_MIN_VERSION]} is required in a threaded environment\n";
 }
 
 =head1 NAME
@@ -33,25 +53,6 @@ TODO
 
 =cut
 
-BEGIN {
-  *__gen_killer_source = BROKEN_SELF_SIGNAL
-
-    ? require POSIX && sub { sprintf <<'EOH', $_[0], $_[1] }
-  my $killer_pid = fork();
-  if (! defined $killer_pid) {
-    die "Unable to fork ($!) while trying to guarantee the following exception:\n$err";
-  }
-  elsif (!$killer_pid) {
-    kill (%d, %d);
-    POSIX::_exit(0);
-  }
-
-EOH
-
-    : sub { "kill( $_[0], $_[1] );" }
-  ;
-}
-
 my $in_global_destroy;
 END { $in_global_destroy = 1 }
 
@@ -63,7 +64,7 @@ my $sigs = do {
   }
 
   # we do not allow use of these signals
-  delete @{$s}{qw/ZERO ALRM KILL SEGV CHLD/};
+  delete @{$s}{qw/ZERO ALRM KILL SEGV ILL BUS CHLD/};
   $s;
 };
 
@@ -137,7 +138,17 @@ sub guarantee_exception (&;@) {
 ### we are in a destroy eval, can't just throw
 ### prepare the ninja-wizard exception guarantor
   if ($sigwrong) {
-    cluck "Unable to set exception guarantor process - invalid signal '$signame' requested. Proceeding in undefined state...";
+    cluck "Unable to set exception guarantor - invalid signal '$signame' requested. Proceeding in undefined state...";
+    die $err;
+  }
+
+  my $use_threads = (
+    RUNNING_IN_HELL
+      or
+    ($INC{'threads.pm'} and threads->tid != 0)
+  );
+  if ($use_threads and ! eval { threads->VERSION(THREADS_MIN_VERSION) } ) {
+    cluck "Unable to set exception guarantor thread - minimum of threads @{[THREADS_MIN_VERSION()]} required. Proceeding in undefined state...";
     die $err;
   }
 
@@ -170,7 +181,10 @@ sub guarantee_exception (&;@) {
         $restore_sig_and_throw_callback->()
       }
     }|,
-    __gen_killer_source($sigs->{$signame}, $$)
+
+    $use_threads        ? __gen_killer_src_threads ($sigs->{$signame}, $$) :
+    BROKEN_SELF_SIGNAL  ? __gen_killer_src_sentinel ($sigs->{$signame}, $$) :
+                          __gen_killer_src_selfsig ($sigs->{$signame}, $$)
   ) or warn "Coderef fail!\n$@";
 
   # start the kill-loop
@@ -190,6 +204,36 @@ sub __in_destroy_eval {
     }
   }
   return 0;
+}
+
+sub __gen_killer_src_threads {
+  return sprintf <<'EOH', $_[0];
+
+  threads->create(
+    sub { $_[0]->kill(%d) },
+    threads->self
+  )->detach;
+EOH
+}
+
+sub __gen_killer_src_sentinel {
+  sprintf <<'EOH', $_[0], $_[1];
+
+    # the SIGCHLD handling is taken care of at the callsite
+    my $killer_pid = fork();
+    if (! defined $killer_pid) {
+      die "Unable to fork ($!) while trying to guarantee the following exception:\n$err";
+    }
+    elsif (!$killer_pid) {
+      kill (%d, %d);
+      POSIX::_exit(0);
+    }
+
+EOH
+}
+
+sub __gen_killer_src_selfsig {
+  "kill( $_[0], $_[1] );"
 }
 
 =head1 AUTHOR
