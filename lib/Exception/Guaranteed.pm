@@ -3,7 +3,7 @@ package Exception::Guaranteed;
 use warnings;
 use strict;
 
-our $VERSION = '0.00_02';
+our $VERSION = '0.00_03';
 $VERSION = eval $VERSION if $VERSION =~ /_/;
 
 use Config;

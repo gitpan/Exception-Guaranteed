@@ -5,7 +5,7 @@ use Test::More;
 use Exception::Guaranteed;
 
 use lib 't';
-use __LabRat;
+use __SelfDestruct;
 
 eval {
   guarantee_exception { die "Simple exception" }
@@ -16,7 +16,7 @@ my $dummy = 0;
 my $fail = 0;
 eval {
   guarantee_exception {
-    __LabRat->spawn_n_kill(sub {
+    __SelfDestruct->spawn_n_kill(sub {
       die 'Exception outer';
     });
   };
@@ -38,7 +38,7 @@ $fail = 0;
 # Hence the dummy count here is essential
 $dummy = 0;
 eval {
-  __LabRat->spawn_n_kill( sub {
+  __SelfDestruct->spawn_n_kill( sub {
     guarantee_exception {
       die 'Exception inner';
     };
@@ -55,10 +55,11 @@ diag( ($dummy||0) . " inc-ops executed before kill-signal delivery (DESTROY g_e)
 ok (!$fail, 'execution stopped after trappable destroy exception');
 like( $@, qr/^Exception inner/, 'DESTROY exception thrown and caught from inside of DESTROY block' );
 
-done_testing;
-
-# important, for the thread re-test, like an exit(0)
-if ($INC{'threads.pm'}) {
+# important, for the thread re-test
+if ($ENV{EXCEPTION_GUARANTEED_SUBTEST}) {
   $ENV{EXCEPTION_GUARANTEED_SUBTEST} = 42;
-  0;
+  0; # like an exit(0)
+}
+else {
+  done_testing;
 }

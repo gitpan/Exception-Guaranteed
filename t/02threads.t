@@ -21,11 +21,8 @@ eval {
 my $rerun_test = 't/01basic.t';
 
 my $worker = threads->create(sub {
-  # simulate a  subtest until threaded subtest() is fixed
-  Test::More->builder->reset;
-  Test::More->builder->_indent(' ' x 4);
+  $ENV{EXCEPTION_GUARANTEED_SUBTEST} = 1;
   my $err = (do $rerun_test) || $@;
-  Test::More->builder->reset;
   die "FAIL: $err" if $err;
   return $ENV{EXCEPTION_GUARANTEED_SUBTEST};
 });

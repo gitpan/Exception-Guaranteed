@@ -11,6 +11,6 @@ Makefile.PL
 MANIFEST			This list of files
 META.yml
 t/01basic.t
-t/02end.t
-t/03threads.t
-t/__LabRat.pm
+t/02threads.t
+t/03end.t
+t/__SelfDestruct.pm

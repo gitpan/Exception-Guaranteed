@@ -1,4 +1,4 @@
-package __LabRat;
+package __SelfDestruct;
 
 use warnings;
 use strict;

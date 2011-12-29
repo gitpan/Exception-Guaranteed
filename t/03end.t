@@ -5,7 +5,7 @@ use Test::More;
 use Exception::Guaranteed;
 
 use lib 't';
-use __LabRat;
+use __SelfDestruct;
 
 my $dummy = 0;
 
@@ -14,7 +14,7 @@ $SIG{__DIE__} = sub { $err = shift };
 
 my $final_fn = __FILE__;
 my $final_ln = __LINE__ + 1;
-__LabRat->spawn_n_kill( sub { guarantee_exception { die 'Final untrapped exception' } } );
+__SelfDestruct->spawn_n_kill( sub { guarantee_exception { die 'Final untrapped exception' } } );
 
 while ($dummy < 2**31) {
   $dummy++;
@@ -31,8 +31,7 @@ END {
   );
 
   # check, and then change $? set by the last die
-  is ($?, 255, '$? correctly set by untrapped die()')   # $? in END{} is *NOT* 16bit
-    unless Exception::Guaranteed::RUNNING_IN_HELL;      # and windows does crazy shit with $?
+  is ($?, 255, '$? correctly set by untrapped die()');   # $? in END{} is *NOT* 16bit
 
   $? = 0; # so test will pass
   done_testing;
