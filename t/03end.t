@@ -31,8 +31,8 @@ END {
   );
 
   # check, and then change $? set by the last die
-  is ($?, 255, '$? correctly set by untrapped die()');   # $? in END{} is *NOT* 16bit
+  is ($?, 255, '$? correctly set by untrapped die()')   # $? in END{} is *NOT* 16bit
+    and $? = 0; # adjust the exit to "passing" (0) IFF the test didn't fail
 
-  $? = 0; # so test will pass
   done_testing;
 }

@@ -3,7 +3,7 @@ package Exception::Guaranteed;
 use warnings;
 use strict;
 
-our $VERSION = '0.00_03';
+our $VERSION = '0.00_04';
 $VERSION = eval $VERSION if $VERSION =~ /_/;
 
 use Config;
@@ -67,6 +67,34 @@ my $sigs = do {
   delete @{$s}{qw/ZERO ALRM KILL SEGV ILL BUS CHLD/};
   $s;
 };
+
+# not a plain sub declaration - we want to inline as much
+# as possible into the signal handler when we create it
+# without having to do any extra ENTERSUBs
+my $in_destroy_eval_src = <<'EOS';
+do {
+  if (defined $^S and !$^S) {
+    0;
+  }
+  else {
+    my ($r, $f);
+    while (my $called_sub = (caller($f++))[3] ) {
+      if ($called_sub eq '(eval)') {
+        last
+      }
+      elsif ($called_sub =~ /::DESTROY$/) {
+        $r = 1;
+      }
+    }
+
+    $r;
+  }
+}
+EOS
+
+# we also call it externally, so declare a plain sub as well
+eval "sub __in_destroy_eval { $in_destroy_eval_src }";
+
 
 my $guarantee_state = {};
 sub guarantee_exception (&;@) {
@@ -158,29 +186,28 @@ sub guarantee_exception (&;@) {
     BROKEN_SELF_SIGNAL ? ( CHLD => $SIG{CHLD} ) : (),
   };
 
-  my $restore_sig_and_throw_callback = sub {
-    for (keys %$orig_handlers) {
-      if (defined $orig_handlers->{$_}) {
-        $SIG{$_} = $orig_handlers->{$_};
-      }
-      else {
-        delete $SIG{$_};
-      }
-    }
-    die $err;
-  };
-
-
   # use a string eval, minimize time spent in the handler
+  # the longer we are here, the further the main thread/fork will
+  # drift down its op-tree
   my $sig_handler = $SIG{$signame} = eval( sprintf
     q|sub {
-      if (__in_destroy_eval('in_sig')) {
+      if (%s) {
         %s
       }
       else {
-        $restore_sig_and_throw_callback->()
+        for (keys %%$orig_handlers) { # sprintf hence the %%
+          if (defined $orig_handlers->{$_}) {
+            $SIG{$_} = $orig_handlers->{$_};
+          }
+          else {
+            delete $SIG{$_};
+          }
+        }
+        die $err;
       }
     }|,
+
+    $in_destroy_eval_src,
 
     $use_threads        ? __gen_killer_src_threads ($sigs->{$signame}, $$) :
     BROKEN_SELF_SIGNAL  ? __gen_killer_src_sentinel ($sigs->{$signame}, $$) :
@@ -191,20 +218,6 @@ sub guarantee_exception (&;@) {
   $sig_handler->();
 }
 
-sub __in_destroy_eval {
-  return 0 if (defined $^S and !$^S);
-
-  my $f = ($_[0] ? 3 : 1);
-  while (my $called_sub = (caller($f++))[3] ) {
-    if ($called_sub eq '(eval)') {
-      return 0;
-    }
-    elsif ($called_sub =~ /::DESTROY$/) {
-      return 1;
-    }
-  }
-  return 0;
-}
 
 sub __gen_killer_src_threads {
   return sprintf <<'EOH', $_[0];

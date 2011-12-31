@@ -8,6 +8,7 @@ use inc::Module::Install '1.01';
 perl_version '5.006';
 
 test_requires 'Test::More'      => '0.92';
+test_requires 'Time::HiRes'     => '0';
 
 all_from 'lib/Exception/Guaranteed.pm';
 

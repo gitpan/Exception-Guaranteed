@@ -1,6 +1,8 @@
 use warnings;
 use strict;
 
+use Time::HiRes 'time';
+
 use Config;
 # Manual skip, because Test::More can not load before threads.pm
 BEGIN {
@@ -50,11 +52,10 @@ else {
 }
 
 cmp_ok ($waited_for, '>', 0, 'Main thread slept for some time');
-cmp_ok (
-  $waited_for,
-  '<=',
-  $loops * $sleep_per_loop,
-  "$waited_for second sleep in main thread appears undisturbed"
+ok (
+  # there should be less than a second of difference here
+  ($waited_for - ($loops * $sleep_per_loop) < 1),
+  "sleep in main thread appears undisturbed: $waited_for seconds after $loops loops of $sleep_per_loop secs"
 );
 
 
