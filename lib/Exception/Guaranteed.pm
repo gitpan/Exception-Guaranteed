@@ -3,7 +3,7 @@ package Exception::Guaranteed;
 use warnings;
 use strict;
 
-our $VERSION = '0.00_04';
+our $VERSION = '0.00_05';
 $VERSION = eval $VERSION if $VERSION =~ /_/;
 
 use Config;
@@ -77,7 +77,11 @@ do {
     0;
   }
   else {
-    my ($r, $f);
+    # we can always skip the first 2 frames because we are called either
+    # from the __in_destroy_eval sub generated below whic is called by guarantee_exception
+    # OR
+    # we are called from a signal handler where the first 2 frames are the SIG and an eval
+    my ($f, $r) = 2;
     while (my $called_sub = (caller($f++))[3] ) {
       if ($called_sub eq '(eval)') {
         last
