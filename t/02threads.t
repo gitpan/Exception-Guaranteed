@@ -35,9 +35,12 @@ my $loops = 0;
 do {
   $loops++;
   sleep $sleep_per_loop;
-} while (!$worker->is_joinable and ( ($loops * $sleep_per_loop) < 10 ) );
+} while (
+  !$worker->is_joinable
+    and
+  ( ($loops * $sleep_per_loop) < ($ENV{AUTOMATED_TESTING} ? 120 : 10 ) )  # some smokers are *really* slow
+);
 my $waited_for = time - $started_waitloop;
-
 
 if ($worker->is_joinable) {
   my $ret = $worker->join;
